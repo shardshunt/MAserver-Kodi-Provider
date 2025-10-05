@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import aiohttp
+from aiohttp import ClientTimeout, BasicAuth
 from music_assistant.models.player_provider import PlayerProvider
 from .player import KodiPlayer
 
@@ -13,10 +14,10 @@ class KodiPlayerProvider(PlayerProvider):
 
     async def handle_async_init(self) -> None:
         """Handle async initialization of the provider."""
-        self.kodi_host = self.config.get_value("host", "127.0.0.1")
-        self.kodi_port = self.config.get_value("port", 8080)
-        self.kodi_user = self.config.get_value("username", "")
-        self.kodi_pass = self.config.get_value("password", "")
+        self.kodi_host = str(self.config.get_value("host", "127.0.0.1") or "127.0.0.1")
+        self.kodi_port = int(self.config.get_value("port", 8080) or 8080)
+        self.kodi_user = str(self.config.get_value("username", "") or "")
+        self.kodi_pass = str(self.config.get_value("password", "") or "")
 
     async def loaded_in_mass(self) -> None:
         """Called after the provider has been fully loaded into Music Assistant."""
@@ -37,15 +38,10 @@ class KodiPlayerProvider(PlayerProvider):
 
         while True:
             try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.post(
-                        url,
-                        json=payload,
-                        auth=aiohttp.BasicAuth(self.kodi_user, self.kodi_pass)
-                        if self.kodi_user
-                        else None,
-                        timeout=5,
-                    ) as resp:
+                timeout = ClientTimeout(total=5)
+                auth = BasicAuth(self.kodi_user, self.kodi_pass) if self.kodi_user else None
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.post(url, json=payload, auth=auth) as resp:
                         data = await resp.json()
                         if data.get("result") == "pong":
                             break
