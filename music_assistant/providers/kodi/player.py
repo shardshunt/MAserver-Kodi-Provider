@@ -2,7 +2,7 @@ from __future__ import annotations
 import aiohttp
 import asyncio
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from music_assistant_models.enums import PlaybackState, PlayerFeature, PlayerType
 from music_assistant.models.player import Player, PlayerMedia
 
@@ -34,17 +34,19 @@ class KodiPlayer(Player):
         }
         self._set_attributes()
 
-    async def _jsonrpc(self, method: str, params: dict | None = None) -> dict:
+    async def _jsonrpc(self, method: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         url = f"http://{self.host}:{self.port}/jsonrpc"
         auth = aiohttp.BasicAuth(self.username, self.password) if self.username else None
-        payload = {"jsonrpc": "2.0", "id": 1, "method": method}
+        payload: dict[str, Any] = {"jsonrpc": "2.0", "id": 1, "method": method}
         if params:
             payload["params"] = params
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(url, json=payload, auth=auth, timeout=10) as resp:
-                    return await resp.json()
+            timeout = aiohttp.ClientTimeout(total=10)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(url, json=payload, auth=auth) as resp:
+                    result: dict[str, Any] = await resp.json()
+                    return result
         except (asyncio.TimeoutError, aiohttp.ClientError) as err:
             self.logger.warning("Failed to reach Kodi at %s: %s", url, err)
             self._attr_powered = False
