@@ -113,11 +113,25 @@ class KodiPlayer(Player):
 
     async def enqueue_next_media(self, media: PlayerMedia) -> None:
         await self._poll_ready.wait()
-        self.logger.debug("Enqueueing next media for Kodi: %s", media.uri)
+        self.logger.debug("Attempting to enqueue media for Kodi: %s", media.uri)
+
+        # Get current playlist items
+        playlist_resp = await self._jsonrpc(
+            "Playlist.GetItems",
+            {"playlistid": 0, "properties": ["file"]}
+        )
+        playlist_items = playlist_resp.get("result", {}).get("items", []) or []
+
+        # Skip if media already in playlist
+        if any(item.get("file") == media.uri for item in playlist_items):
+            self.logger.warning("Skipping enqueue: %s already in playlist", media.uri)
+            return
+
         await self._jsonrpc("Playlist.Add", {
             "playlistid": 0,
             "item": {"file": media.uri}
         })
+        self.logger.debug("Enqueued new media for Kodi: %s", media.uri)
 
     async def on_unload(self) -> None:
         self.logger.info("Kodi player %s unloaded", self.name)
@@ -218,10 +232,11 @@ class KodiPlayer(Player):
 
             # Handle backward seek
             if current_seconds < last_known - 1:
-                self.logger.debug("Detected backward seek: old=%.2f, new=%.2f", last_known, current_seconds)
+                self.logger.debug("Time: Handle backward seek: last_known=%.2f, current_seconds=%.2f", last_known, current_seconds)
                 self._attr_elapsed_time = current_seconds
             # Handle stalled playback
             elif speed > 0 and current_seconds <= last_known:
+                self.logger.debug("Time: Handle stalled playback: last_known=%.2f, current_seconds=%.2f", current_seconds, last_known)
                 current_seconds = last_known + elapsed_real
                 self._attr_elapsed_time = current_seconds
             else:
