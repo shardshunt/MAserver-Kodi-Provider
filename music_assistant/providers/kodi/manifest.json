@@ -1,0 +1,10 @@
+{
+  "type": "player",
+  "domain": "kodi",
+  "name": "Kodi Player Provider",
+  "description": "Kodi JSON-RPC based Player Provider for Music Assistant.",
+  "codeowners": ["@yourgithubusername"],
+  "requirements": ["aiohttp"],
+  "documentation": "https://kodi.wiki/view/JSON-RPC_API",
+  "mdns_discovery": ["_http._tcp.local."]
+}
